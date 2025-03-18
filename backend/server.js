@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const sequelize = require('./config/db'); // Import Sequelize instance
 const router = require('./routes/index');
-
+const path = require('path')
 // Import Models (Sequelize automatically creates tables)
 const Customer = require('./models/customerModel');
 const Category = require('./models/categoryModel');
@@ -13,6 +13,8 @@ const InvoiceItem = require('./models/invoiceItemModel');
 // Middleware to parse request body
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
+
+app.use('/static',express.static(path.join(__dirname, 'public')))
 
 // Set EJS as templating engine
 app.set('view engine', 'ejs');
