@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Bree+Serif&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+        integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <title>Invoice List</title>
+    <style>
+        * {
+            font-family: "Bree Serif", serif;
+            font-weight: 400;
+            font-style: normal;
+
+        }
+    </style>
+    <script>
+        const loadData = async () => {
+            try {
+                const categories = await axios.get('/api/categories')
+                categoriesData = categories.data.response;
+                populateCategories(categoriesData)
+
+            } catch (error) {
+                console.error("Error loading data:", error);
+            }
+        };
+        const loadInvoices = async (i =1) => {
+            try {
+                const invoices = await axios.get(`/api/invoices?page=${i}`);
+                const apiResponse = invoices.data;
+                document.getElementById('page_count').textContent = `Showing ${(apiResponse.invoices.currentPage - 1) * apiResponse.invoices.limit + 1} to ${(apiResponse.invoices.currentPage + 1* apiResponse.invoices.currentItems)} of ${apiResponse.invoices.count} entries`;
+            
+                // Create pagination buttons dynamically
+                const paginationContainer = document.getElementById('pagination_buttons');
+                paginationContainer.innerHTML = ` <button
+                    class="rounded-md rounded-r-none border border-r-0 border-slate-300 py-2 px-3 text-center text-sm transition-all shadow-sm hover:shadow-lg text-slate-600 hover:text-white hover:bg-slate-800 hover:border-slate-800 focus:text-white focus:bg-slate-800 focus:border-slate-800 active:border-slate-800 active:text-white active:bg-slate-800 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
+                    type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd"
+                            d="M11.03 3.97a.75.75 0 0 1 0 1.06l-6.22 6.22H21a.75.75 0 0 1 0 1.5H4.81l6.22 6.22a.75.75 0 1 1-1.06 1.06l-7.5-7.5a.75.75 0 0 1 0-1.06l7.5-7.5a.75.75 0 0 1 1.06 0Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>`;
+                
+                for (let i = 1; i <= apiResponse.invoices.totalPages; i++) {
+                    paginationContainer.innerHTML += `<button onClick='changePageNumber(${i})'
+                    class="rounded-md rounded-r-none rounded-l-none border border-r-0 border-slate-300 py-2 px-3 text-center text-sm  ${i == apiResponse.invoices.currentPage ? 'bg-slate-800 text-white': ''}"
+                    type="button">
+                    ${i}
+                </button>`;   
+            }
+
+            paginationContainer.innerHTML += `<button
+                    class="rounded-md rounded-l-none border border-slate-300 py-2 px-3 text-center text-sm transition-all shadow-sm hover:shadow-lg text-slate-600 hover:text-white hover:bg-slate-800 hover:border-slate-800 focus:text-white focus:bg-slate-800 focus:border-slate-800 active:border-slate-800 active:text-white active:bg-slate-800 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
+                    type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd"
+                            d="M12.97 3.97a.75.75 0 0 1 1.06 0l7.5 7.5a.75.75 0 0 1 0 1.06l-7.5 7.5a.75.75 0 1 1-1.06-1.06l6.22-6.22H3a.75.75 0 0 1 0-1.5h16.19l-6.22-6.22a.75.75 0 0 1 0-1.06Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>`;
+            
+
+                populateInvoices(invoices.data.invoices.rows);
+
+            } catch (error) {
+                console.error("Error loading data:", error);
+                
+            }
+        };
+
+        const changePageNumber = (i) => {
+            console.log(`Fetching data for page ${i}`);
+            loadInvoices(i)
+
+        }
+        const populateCategories = (categoriesData) => {
+            let selectElement = document.querySelectorAll("#category");
+            selectElement.forEach((selectElement) => {
+                if (!selectElement.value) {
+                    selectElement.innerHTML = '<option value="">Select Category</option>';
+                    categoriesData.forEach(category => {
+                        const option = document.createElement("option");
+                        option.value = category.id;
+                        option.textContent = category.name;
+                        selectElement.appendChild(option);
+                    });
+                }
+
+            })
+        };
+
+        const deleteInvoice = async (invoiceId) => {
+            try {
+                await axios.delete(`/api/invoices/${invoiceId}`)
+                loadInvoices()
+            } catch (error) {
+                console.error(
+                    'Error in updatIng the invoice status: ', error
+                );
+            }
+
+
+        }
+
+        const markAsDone = async (invoiceId) => {
+            try {
+                await axios.patch(`/api/invoices/${invoiceId}`, { status: "Complete"})
+                loadInvoices();
+            } catch (error) {
+                console.error(
+                    'Error in updatIng the invoice status: ', error
+                );
+
+            }
+
+        }
+
+        const populateInvoices = (invoices) => {
+            let tableBody = document.querySelector('#table-body');
+            tableBody.innerHTML = ''
+            invoices.forEach((invoice, index) => {
+                tableBody.innerHTML += `<tr class="hover:bg-slate-50">
+
+                    <td class="p-2 border-gray-300 border">
+                        <p class="text-sm font-bold">
+                           ${index + 1}
+                        </p>
+                    </td>
+                    <td class="p-2 border-gray-300 border">
+                        <p class="text-sm font-bold">
+                           ${invoice.invoice_number}
+                        </p>
+                    </td>
+                    <td class="p-2 border-gray-300 border">
+                        <p class="text-sm">
+                            ${invoice.Customer.name}
+                        </p>
+                    </td>
+                    <td class="p-2 border-gray-300 border">
+                        <p class="text-sm">
+                        ${invoice.Customer.address}
+                        </p>
+                    </td>
+                    <td class="p-2 border-gray-300 border">
+                        <p class="text-sm">
+                            ${invoice.total_amount}
+                        </p>
+                    </td>
+                    <td class="p-2 border-gray-300 border">
+                        <p class="text-sm text-center rounded-full text-white  ${invoice.status == 'Pending' ? 'bg-orange-500 py-2' : 'bg-green-700 px-4 py-2'}">${invoice.status}</p>
+                    </td>
+                    <td class="p-2 border-gray-300 border">
+                        <span class=" flex items-center space-x-4">
+                            ${invoice.status !== 'Complete' ?
+                        ` <i onClick='deleteInvoice(${invoice.id})' class=" cursor-pointer text-sm fa-solid fa-trash text-red-700 px-2 py-2 rounded border-1"></i>
+                            <i onClick="markAsDone(${invoice.id})" class="cursor-pointer text-sm fa-solid fa-circle-check text-green-800 px-2 py-2 rounded border-1"></i>` : '<span class="text-center w-6 h-1 border bg-black mx-auto"> </span>'
+                    }
+                           
+                            
+                        </span>
+                    </td>
+                </tr>`;
+            })
+        }
+
+        window.addEventListener("load", () => {
+            loadData();
+            loadInvoices()
+        });
+
+    </script>
+</head>
+
+<body>
+    <div class="relative flex flex-col w-full h-[100vh] overflow-auto text-gray-700 bg-white  p-5">
+        <div class="flex items-center w-full justify-between p-2 bg-slate-900 text-white">
+            <span class="text-3xl font-bold">
+                Profilics
+            </span>
+
+        </div>
+        <div class="flex items-center w-full justify-between p-5">
+            <span class="text-3xl font-bold">
+                Invoice list
+            </span>
+            <a href="/add-invoice" class="px-4 py-2 bg-slate-900 text-white">
+                Add Invoice
+            </a>
+
+        </div>
+        <div class="flex items-center w-full justify-between p-5">
+            <div class="w-full max-w-sm min-w-[700px]">
+                <input
+                    class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded-md px-3 py-2 transition duration-300 ease focus:outline-none focus:border-blue-500 hover:border-blue-300 shadow-sm focus:shadow"
+                    placeholder="Search by invoice number, customer name, address or amount" />
+            </div>
+            <div class="w-full max-w-sm min-w-[200px]">
+
+                <div class="relative">
+                    <select id="category" placeholder="select category"
+                        class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
+
+
+                    </select>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.2"
+                        stroke="currentColor" class="h-5 w-5 ml-1 absolute top-2.5 right-2.5 text-slate-700">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                    </svg>
+                </div>
+            </div>
+
+        </div>
+
+        <table class="w-full text-left table-fixed min-w-max text-slate-800 border-collapse border">
+            <thead>
+                <tr class="text-slate-500 border-b border-slate-300 bg-slate-50">
+                    <th class="p-4 border border-gray-300">
+                        <p class="text-sm leading-none font-normal">
+                           Id
+                        </p>
+                    </th>
+                    <th class="p-4 border border-gray-300">
+                        <p class="text-sm leading-none font-normal">
+                            Invoice number
+                        </p>
+                    </th>
+                    <th class="p-4 border border-gray-300">
+                        <p class="text-sm leading-none font-normal">
+                            customer name
+                        </p>
+                    </th>
+                    <th class="p-4 border border-gray-300">
+                        <p class="text-sm leading-none font-normal">
+                            Address
+                        </p>
+                    </th>
+                    <th class="p-4 border border-gray-300">
+                        <p class="text-sm leading-none font-normal">
+                            totalAmount
+                        </p>
+                    </th>
+                    <th class="p-4 border border-gray-300">
+                        <p class="text-sm leading-none font-normal">
+                            Status
+                        </p>
+                    </th>
+                    <th class="p-4 border border-gray-300">
+                        <p class="text-sm leading-none font-normal">
+                            Actions
+                        </p>
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+
+
+            </tbody>
+        </table>
+        <div class="flex items-center w-full justify-between p-5">
+            <div class="flex items-center w-full justify-between p-5">
+                <span id="page_count">Showing 1 to 10 of 50 entries</span>
+                <div class="row flex" id="pagination_buttons">
+                    <!-- Pagination buttons will be dynamically inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
