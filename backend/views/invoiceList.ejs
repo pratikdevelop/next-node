@@ -32,12 +32,22 @@
                 console.error("Error loading data:", error);
             }
         };
-        const loadInvoices = async (i =1) => {
+        const loadInvoices = async (i = 1, categoryId=null) => {
             try {
-                const invoices = await axios.get(`/api/invoices?page=${i}`);
+                const invoices = await axios.get(`/api/invoices?page=${i}&category=${categoryId}`);
+                console.log(
+                    invoices.data
+                );
+                
                 const apiResponse = invoices.data;
-                document.getElementById('page_count').textContent = `Showing ${(apiResponse.invoices.currentPage - 1) * apiResponse.invoices.limit + 1} to ${(apiResponse.invoices.currentPage + 1* apiResponse.invoices.currentItems)} of ${apiResponse.invoices.count} entries`;
-            
+                const startItem = (apiResponse.pagination.currentPage - 1) * apiResponse.pagination.limit + 1;
+                const endItem = Math.min(startItem + apiResponse.pagination.limit - 1, apiResponse.pagination.count);
+
+                // Display the values in the UI
+                document.getElementById('start-item').textContent = startItem;
+                document.getElementById('end-item').textContent = endItem;
+                document.getElementById('total-items').textContent = apiResponse.pagination.count;
+
                 // Create pagination buttons dynamically
                 const paginationContainer = document.getElementById('pagination_buttons');
                 paginationContainer.innerHTML = ` <button
@@ -49,16 +59,16 @@
                             clip-rule="evenodd" />
                     </svg>
                 </button>`;
-                
-                for (let i = 1; i <= apiResponse.invoices.totalPages; i++) {
+
+                for (let i = 1; i <= apiResponse.pagination.totalPages; i++) {
                     paginationContainer.innerHTML += `<button onClick='changePageNumber(${i})'
-                    class="rounded-md rounded-r-none rounded-l-none border border-r-0 border-slate-300 py-2 px-3 text-center text-sm  ${i == apiResponse.invoices.currentPage ? 'bg-slate-800 text-white': ''}"
+                    class="rounded-md rounded-r-none rounded-l-none border border-r-0 border-slate-300 py-2 px-3 text-center text-sm  ${i == apiResponse.pagination.currentPage ? 'bg-slate-800 text-white' : ''}"
                     type="button">
                     ${i}
-                </button>`;   
-            }
+                </button>`;
+                }
 
-            paginationContainer.innerHTML += `<button
+                paginationContainer.innerHTML += `<button
                     class="rounded-md rounded-l-none border border-slate-300 py-2 px-3 text-center text-sm transition-all shadow-sm hover:shadow-lg text-slate-600 hover:text-white hover:bg-slate-800 hover:border-slate-800 focus:text-white focus:bg-slate-800 focus:border-slate-800 active:border-slate-800 active:text-white active:bg-slate-800 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
                     type="button">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
@@ -67,13 +77,13 @@
                             clip-rule="evenodd" />
                     </svg>
                 </button>`;
-            
 
-                populateInvoices(invoices.data.invoices.rows);
+
+                populateInvoices(invoices.data.invoices);
 
             } catch (error) {
                 console.error("Error loading data:", error);
-                
+
             }
         };
 
@@ -113,7 +123,7 @@
 
         const markAsDone = async (invoiceId) => {
             try {
-                await axios.patch(`/api/invoices/${invoiceId}`, { status: "Complete"})
+                await axios.patch(`/api/invoices/${invoiceId}`, { status: "Complete" })
                 loadInvoices();
             } catch (error) {
                 console.error(
@@ -124,6 +134,10 @@
 
         }
 
+
+        const changeCategory = (value) =>{
+            loadInvoices(1, value)
+        }
         const populateInvoices = (invoices) => {
             let tableBody = document.querySelector('#table-body');
             tableBody.innerHTML = ''
@@ -206,7 +220,7 @@
             <div class="w-full max-w-sm min-w-[200px]">
 
                 <div class="relative">
-                    <select id="category" placeholder="select category"
+                    <select id="category" onchange="changeCategory(this.value)" placeholder="select category"
                         class="w-full bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded pl-3 pr-8 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-400 shadow-sm focus:shadow-md appearance-none cursor-pointer">
 
 
@@ -226,7 +240,7 @@
                 <tr class="text-slate-500 border-b border-slate-300 bg-slate-50">
                     <th class="p-4 border border-gray-300">
                         <p class="text-sm leading-none font-normal">
-                           Id
+                            Id
                         </p>
                     </th>
                     <th class="p-4 border border-gray-300">
@@ -268,7 +282,14 @@
         </table>
         <div class="flex items-center w-full justify-between p-5">
             <div class="flex items-center w-full justify-between p-5">
-                <span id="page_count">Showing 1 to 10 of 50 entries</span>
+                <div class="flex items-center space-x-1">
+                    <span> Showing</span> 
+                    <span id="start-item"></span>
+                    <span>to</span> 
+                    <span id="end-item"></span>
+                    <span>of</span> 
+                    <span id="total-items"></span>
+                </div>
                 <div class="row flex" id="pagination_buttons">
                     <!-- Pagination buttons will be dynamically inserted here -->
                 </div>

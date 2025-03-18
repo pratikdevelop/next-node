@@ -75,59 +75,73 @@ const invoiceControllers = {
         }
     },
 
-    /**Fetch All Invoices */
-    getAllInvoices: async (req, res) => {
-        try {
-          // Get pagination parameters from the query string
-          const { page = 1, limit = 10, search = '', category = '' } = req.query;
-          const offset = (page - 1) * limit;
-      
-          // Build filters
-          let whereConditions = {};
-      
-          if (search) {
-            whereConditions[Op.or] = [
-              { invoice_number: { [Op.like]: `%${search}%` } },
-              { '$Customer.name$': { [Op.like]: `%${search}%` } },  // Filtering by customer name
-              { '$Customer.address$': { [Op.like]: `%${search}%` } },  // Filtering by customer address
-              { total_amount: { [Op.like]: `%${search}%` } }
-            ];
-          }
-      
-        //   if (category) {
-        //     whereConditions['$Products.category_id$'] = category;  // Filtering by product category
-        //   }
-      
-          // Fetch invoices with pagination and filters
-          const invoices = await invoiceModel.findAndCountAll({
-            where: whereConditions,
-            include: [
-              {
-                model: customersModel,
-                attributes: ['name', 'address']  // Include only relevant customer details
-              },
-              
-            ],
-            limit,
-            offset,
-          });
-      
-          // Calculate total pages
-          const totalPages = Math.ceil(invoices.count / limit);
-      
-        invoices[`limit`] = limit;
-        invoices[`currentItems`] = invoices.rows.length;
-        invoices['currentPage'] = page
-        invoices['totalPages'] = totalPages;
 
-        // return the invoice with complete pagination options 
-        return res.status(200).json({ invoices});
-        } catch (err) {
-          console.error(err);
-          return res.status(500).send({ message: 'Error fetching invoices' });
+    getAllInvoices: async (req, res) => {
+      try {
+        // Get pagination parameters from the query string
+        const { page = 1, limit = 10, search = '', category = '' } = req.query;
+        const offset = (page - 1) * limit;
+    
+        // Build filters
+        let whereConditions = {};
+    
+        if (search) {
+          whereConditions[Op.or] = [
+            { invoice_number: { [Op.like]: `%${search}%` } },
+            { '$Customer.name$': { [Op.like]: `%${search}%` } },  // Filtering by customer name
+            { '$Customer.address$': { [Op.like]: `%${search}%` } },  // Filtering by customer address
+            { total_amount: { [Op.eq]: search } }  // Changed Op.like to Op.eq for numeric field
+          ];
         }
-      },
-      
+    
+        if (category && !isNaN(category)) {
+          // Filter invoices by category through the InvoiceItem and Product models
+          const invoice_Ids = await invoiceItemModel.findAll({
+            attributes: ['invoice_id'],
+            include: [{
+              model: productModel,
+              where: { category_id: category }, // Assuming category_id is in the Products table
+              attributes: []
+            }]
+          });
+          whereConditions['id'] = { [Op.in]: invoice_Ids.map(item => item.invoice_id) };
+        }
+    
+        // Fetch invoices with pagination and filters
+        const invoices = await invoiceModel.findAndCountAll({
+          where: whereConditions,
+          include: [
+            {
+              model: customersModel,
+              attributes: ['name', 'address']  // Include only relevant customer details
+            },
+          ],
+          limit,
+          offset,
+        });
+    
+        // Calculate total pages
+        const totalPages = Math.ceil(invoices.count / limit);
+    
+        // Send the invoice with pagination options
+        return res.status(200).json({
+          invoices: invoices.rows,
+          pagination: {
+            limit,
+            currentItems: invoices.rows.length,
+            currentPage: page,
+            totalPages,
+            count: invoices.count,
+            
+
+          }
+        });
+    
+      } catch (err) {
+        console.error(err);  // Log detailed error
+        return res.status(500).send({ message: 'Error fetching invoices' });
+      }
+    },    
 
     /**Fetch Invoice by ID */
     getInvoiceById: async (req, res) => {
