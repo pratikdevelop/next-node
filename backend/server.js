@@ -1,34 +1,44 @@
+'use strict';
+
 const express = require('express');
-const app = express();
-const sequelize = require('./config/db'); // Import Sequelize instance
+const path = require('path');
+const db = require('./models'); // Import the db object from models/index.js
 const router = require('./routes/index');
-const path = require('path')
-// Import Models (Sequelize automatically creates tables)
-const Customer = require('./models/customerModel');
-const Category = require('./models/categoryModel');
-const Product = require('./models/productModel');
-const Invoice = require('./models/invoiceModel');
-const InvoiceItem = require('./models/invoiceItemModel'); 
+
+const app = express();
 
 // Middleware to parse request body
-app.use(express.json()); 
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/static',express.static(path.join(__dirname, 'public')))
+// Serve static files
+app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // Set EJS as templating engine
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views')); // Explicitly set views directory (optional)
 
 // Set routing
 app.use('/', router);
 
 // Sync Sequelize Models & Create Tables (if not exist)
-sequelize.sync({ force: false }) // Change `force: true` if you want to reset tables
-  .then(() => console.log('✅ Database synced with Sequelize'))
-  .catch(err => console.error('❌ Sequelize sync error:', err));
+const syncDatabase = async () => {
+  try {
+    await db.sequelize.sync({ force: false }); // Use db.sequelize instead of raw sequelize
+    console.log('✅ Database synced with Sequelize');
+  } catch (err) {
+    console.error('❌ Sequelize sync error:', err);
+    process.exit(1); // Exit on failure to ensure server doesn’t run with a bad DB
+  }
+};
 
 // Start Server
 const PORT = 4500;
-app.listen(PORT, () => {
-  console.log(`🚀 Server started successfully on port ${PORT}`);
-});
+const startServer = async () => {
+  await syncDatabase(); // Sync DB before starting the server
+  app.listen(PORT, () => {
+    console.log(`🚀 Server started successfully on port ${PORT}`);
+  });
+};
+
+startServer();

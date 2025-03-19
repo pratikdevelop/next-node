@@ -13,10 +13,15 @@ const loadData = async () => {
         customers = customerResponse.data.response;
         categories = categoryResponse.data.response;
 
+        if (customers.length === 0 || categories.length === 0) {
+            throw new Error('No customers or categories available');
+        }
+
         populateCustomers();
         populateCategories();
     } catch (error) {
         console.error("Error loading data:", error);
+        alert("Failed to load customers or categories. Please try again later.");
     }
 };
 
@@ -34,9 +39,9 @@ const populateCustomers = () => {
 
 // Populate categories in all selects
 const populateCategories = () => {
-    let selectElement = document.querySelectorAll(".category");
-    selectElement.forEach((selectElement)=>{
-        if (!selectElement.value){
+    const selectElements = document.querySelectorAll(".category");
+    selectElements.forEach(selectElement => {
+        if (!selectElement.value) {
             selectElement.innerHTML = '<option value="">Select Category</option>';
             categories.forEach(category => {
                 const option = document.createElement("option");
@@ -45,15 +50,24 @@ const populateCategories = () => {
                 selectElement.appendChild(option);
             });
         }
-
-    })
+    });
 };
 
 // Fetch products based on category
 const loadProducts = async (categoryId, productSelect) => {
     try {
+        if (!categoryId) {
+            productSelect.innerHTML = '<option value="">Select Product</option>';
+            return;
+        }
         const response = await axios.get(`/api/products?category_id=${categoryId}`);
         products = response.data.response;
+
+        if (products.length === 0) {
+            productSelect.innerHTML = '<option value="">No Products Available</option>';
+            return;
+        }
+
         productSelect.innerHTML = '<option value="">Select Product</option>';
         products.forEach(product => {
             const option = document.createElement("option");
@@ -64,12 +78,18 @@ const loadProducts = async (categoryId, productSelect) => {
         });
     } catch (error) {
         console.error("Error fetching products:", error);
+        productSelect.innerHTML = '<option value="">Error Loading Products</option>';
     }
 };
 
 // Add invoice row
 const addInvoiceRow = () => {
     const tbody = document.querySelector("tbody");
+    if (!tbody) {
+        console.error("Table body not found");
+        return;
+    }
+
     const newRow = document.createElement("tr");
     newRow.classList.add("hover:bg-slate-50");
     newRow.innerHTML = `
@@ -84,7 +104,7 @@ const addInvoiceRow = () => {
             </select>
         </td>
         <td class="p-4">
-            <input type="number" min="1" class="quantity w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="1" onchange="updateRowTotal(this)" />
+            <input type="number" min="1" max="1000" class="quantity w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="1" onchange="updateRowTotal(this)" />
         </td>
         <td class="p-4">
             <input class="price w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="0.00" readonly />
@@ -103,6 +123,11 @@ const addInvoiceRow = () => {
 
 // Delete row
 const deleteRow = (button) => {
+    const rowCount = document.querySelectorAll("tbody tr").length;
+    if (rowCount <= 1) {
+        alert("Cannot delete the last row. At least one item is required.");
+        return;
+    }
     button.closest("tr").remove();
     updateInvoiceTotal();
 };
@@ -117,7 +142,18 @@ const updateRowTotal = (element) => {
 
     const selectedOption = productSelect.selectedOptions[0];
     const price = selectedOption && selectedOption.dataset.price ? parseFloat(selectedOption.dataset.price) : 0;
-    const quantity = parseInt(quantityInput.value) || 0;
+    let quantity = parseInt(quantityInput.value) || 0;
+
+    // Quantity validation
+    if (quantity < 1) {
+        quantity = 1;
+        quantityInput.value = 1;
+        alert("Quantity must be at least 1.");
+    } else if (quantity > 1000) {
+        quantity = 1000;
+        quantityInput.value = 1000;
+        alert("Quantity cannot exceed 1000.");
+    }
 
     priceInput.value = price.toFixed(2);
     const total = (price * quantity).toFixed(2);
@@ -126,20 +162,28 @@ const updateRowTotal = (element) => {
     updateInvoiceTotal();
 };
 
-const customerChange = (customerId) =>{
-    
-    let customer = customers.find(customer => {
+// Update customer details
+const customerChange = (customerId) => {
+    if (!customerId) {
+        document.getElementById('customer-details').innerHTML = '';
+        return;
+    }
 
-        return  customerId.value == customer.id 
-    })
+    const customer = customers.find(c => c.id == customerId); // Loose comparison for string IDs
+    if (!customer) {
+        alert("Invalid customer selected.");
+        document.getElementById('customer').value = '';
+        document.getElementById('customer-details').innerHTML = '';
+        return;
+    }
+
     document.getElementById('customer-details').innerHTML = `
-    <input class="price w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.address}" readonly />
-    <input class="w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.phone}" readonly />
-    <input class="price w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.city}" readonly />
-    <input class="w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.state}" readonly />
+        <input class="w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.address}" readonly />
+        <input class="w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.phone}" readonly />
+        <input class="w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.city}" readonly />
+        <input class="w-full text-sm border border-slate-200 rounded-md px-3 py-2" value="${customer.state}" readonly />
     `;
-
-}
+};
 
 // Update invoice total
 const updateInvoiceTotal = () => {
@@ -149,7 +193,7 @@ const updateInvoiceTotal = () => {
         invoiceTotal += parseFloat(total.value) || 0;
     });
     document.getElementById("invoiceTotal").innerHTML = `$${invoiceTotal.toFixed(2)}`;
-    totalAmount = invoiceTotal.toFixed(2)
+    totalAmount = invoiceTotal; // Keep as number for submission
 };
 
 // Handle form submission
@@ -162,43 +206,60 @@ const handleSubmit = (event) => {
     }
 
     const invoiceData = {
-        customer_id: customerId,
-        total_amount: totalAmount,
+        customer_id: parseInt(customerId), // Ensure integer
+        total_amount: parseFloat(totalAmount), // Ensure float
         items: []
     };
+
     const rows = document.querySelectorAll("tbody tr");
+    let hasValidItems = false;
+
     rows.forEach(row => {
-        const categorySelect = row.querySelector(".category");
         const productSelect = row.querySelector(".product");
         const quantityInput = row.querySelector(".quantity");
         const priceInput = row.querySelector(".price");
-        const priceTotal = row.querySelector(".total");
+        const totalInput = row.querySelector(".total");
 
-        if (categorySelect.value && productSelect.value) {
-            invoiceData.items.push({
-                product_id: productSelect.value,
-                quantity: parseInt(quantityInput.value),
-                price: parseFloat(priceInput.value),
-                total: parseFloat(priceTotal.value)
-            });
+        if (productSelect.value && quantityInput.value && priceInput.value && totalInput.value) {
+            const quantity = parseInt(quantityInput.value);
+            const price = parseFloat(priceInput.value);
+            const total = parseFloat(totalInput.value);
+
+            if (quantity > 0 && price > 0 && total > 0) {
+                invoiceData.items.push({
+                    product_id: parseInt(productSelect.value),
+                    quantity: quantity,
+                    price: price,
+                    total: total
+                });
+                hasValidItems = true;
+            }
         }
     });
 
-    if (invoiceData.items.length > 0) {
-        axios.post('/api/invoices', invoiceData)
-            .then(response => {
-                alert("Invoice submitted successfully!");
-                document.querySelector("tbody").innerHTML = "";
-                addInvoiceRow();
-                document.getElementById("customer").value = "";
-                document.getElementById("invoiceTotal").innerHTML = '$ 0.00';
-                document.getElementById('customer-details').innerHTML='';
-                // window.location.href ='/';
-            })
-            .catch(error => alert("Error submitting invoice: " + error.message));
-    } else {
-        alert("Please add at least one valid invoice item.");
+    if (!hasValidItems) {
+        alert("Please add at least one valid invoice item with a product, quantity, and total.");
+        return;
     }
+
+    if (invoiceData.total_amount <= 0) {
+        alert("Total amount must be greater than zero.");
+        return;
+    }
+
+    axios.post('/api/invoices', invoiceData)
+        .then(response => {
+            alert("Invoice submitted successfully!");
+            document.querySelector("tbody").innerHTML = "";
+            addInvoiceRow();
+            document.getElementById("customer").value = "";
+            document.getElementById("invoiceTotal").innerHTML = '$0.00';
+            document.getElementById('customer-details').innerHTML = '';
+        })
+        .catch(error => {
+            console.error("Error submitting invoice:", error);
+            alert("Error submitting invoice: " + (error.response?.data?.message || error.message));
+        });
 };
 
 window.addEventListener("load", () => {

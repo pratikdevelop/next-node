@@ -43,6 +43,7 @@ backend/node_modules
 
 # next.js
 frontend/.next/
+frontend/node_modules
 /out/
 
 # production
