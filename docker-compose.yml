@@ -14,15 +14,15 @@ services:
       - NODE_ENV=development
     command: npm run dev
 
-  # backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "4500:4500"
-  #   volumes:
-  #     - ./backend:/app
-  #     - /app/node_modules
-  #   environment:
-  #     - NODE_ENV=development
-  #   command: npm run start
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "4900:4900"  # Port to access the Go API
+    volumes:
+      - ./api:/app
+      - /app/go_modules  # Use a separate volume to store Go modules (optional)
+    environment:
+      - GO_ENV=development
+    command: bash -c "go run /app/api/main.go"
